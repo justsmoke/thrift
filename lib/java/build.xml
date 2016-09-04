@@ -117,6 +117,7 @@
       </manifest>
       <fileset dir="${build.dir}">
         <include name="org/apache/thrift/**/*.class"/>
+        <include name="com/mediav/thrift/**/*.class"/>
         <include name="META-INF/*.txt"/>
       </fileset>
       <fileset dir="src">
@@ -215,6 +216,12 @@
 
   <target name="generate">
     <!-- Generate the thrift gen-java source -->
+    <exec executable="../../compiler/cpp/thrift" failonerror="true">
+      <arg line="--gen java:hashcode ${test.thrift.home}/com/mediav/java/basic.thrift"/>
+    </exec>
+    <exec executable="../../compiler/cpp/thrift" failonerror="true">
+      <arg line="--gen java:hashcode ${test.thrift.home}/com/mediav/java/extended.thrift"/>
+    </exec>
     <exec executable="../../compiler/cpp/thrift" failonerror="true">
       <arg line="--gen java:hashcode ${test.thrift.home}/ThriftTest.thrift"/>
     </exec>

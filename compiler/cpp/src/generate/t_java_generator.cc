@@ -422,8 +422,11 @@ void t_java_generator::generate_enum(t_enum* tenum) {
     indent(f_enum) << "  return " << (*c_iter)->get_name() << ";" << endl;
   }
   
+  // change default to dynamic add enum
   indent(f_enum) << "default:" << endl;
-  indent(f_enum) << "  return null;" << endl;  
+  indent(f_enum) << "  com.mediav.thrift.EnumUtils.addEnum(" << tenum->get_name() 
+                 << ".class, \"$\" + value, new Class[]{int.class}, new Object[]{value});" << endl;
+  indent(f_enum) << "  return " << tenum->get_name() << ".valueOf(\"$\" + value);" << endl;  
 
   indent_down();
 
@@ -1129,6 +1132,9 @@ void t_java_generator::generate_java_struct_definition(ofstream &out,
     out << declare_field(*m_iter, false) << endl;
   }
 
+  // declare unknownFields
+  indent(out) << "public List<com.mediav.thrift.TData> unknownFields;" << endl;
+
   out << endl;
 
   generate_field_name_constants(out, tstruct);
@@ -1244,6 +1250,11 @@ void t_java_generator::generate_java_struct_definition(ofstream &out,
       indent(out) << "}" << endl;
     }
   }
+
+  // handle deepCopy of unknownFields
+  indent(out) << "if (other.unknownFields != null) {" << endl;
+  indent(out) << "  Collections.copy(this.unknownFields, other.unknownFields);" << endl;
+  indent(out) << "}" << endl;
 
   indent_down();
   indent(out) << "}" << endl << endl;
@@ -1496,8 +1507,17 @@ void t_java_generator::generate_java_struct_reader(ofstream& out,
       indent_down();
     }
 
+    // handle default (unknownFields)
     indent(out) << "default:" << endl;
-    indent(out) << "  org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);" << endl;
+    indent(out) << "  if (field.id > " << fields.back()->get_key() << ") {" << endl;
+    indent(out) << "    com.mediav.thrift.TData unknownField = com.mediav.thrift.TProtocolUtils.read(iprot, field);" << endl;
+    indent(out) << "    if (unknownFields == null) {" << endl;
+    indent(out) << "      unknownFields = new LinkedList<com.mediav.thrift.TData>();" << endl;
+    indent(out) << "    }" << endl;
+    indent(out) << "    unknownFields.add(unknownField);" << endl;
+    indent(out) << "  } else {" << endl;
+    indent(out) << "    org.apache.thrift.protocol.TProtocolUtil.skip(iprot, field.type);" << endl;
+    indent(out) << "  }" << endl;
 
     indent_down();
     indent(out) << "}" << endl;
@@ -1620,6 +1640,14 @@ void t_java_generator::generate_java_struct_writer(ofstream& out,
       indent(out) << "}" << endl;
     }
   }
+
+  // write unknownFields
+  indent(out) << "for (com.mediav.thrift.TData unknownField : unknownFields) {" << endl;
+  indent(out) << "  oprot.writeFieldBegin(unknownField.gettField());" << endl;
+  indent(out) << "  com.mediav.thrift.TProtocolUtils.write(oprot, unknownField);" << endl;
+  indent(out) << "  oprot.writeFieldEnd();" << endl;
+  indent(out) << "}" << endl;
+
   // Write the struct map
   out <<
     indent() << "oprot.writeFieldStop();" << endl <<
@@ -3966,6 +3994,10 @@ void t_java_generator::generate_java_struct_clear(std::ofstream& out, t_struct* 
         throw "unsupported type: " + base_type->get_name() + " for field " + field->get_name();
     }
   }
+
+  indent(out) << "this.unknownFields.clear();" << endl;
+  indent(out) << "this.unknownFields = null;" << endl;
+
   indent_down();
 
   indent(out) << "}" << endl << endl;
